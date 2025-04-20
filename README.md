@@ -134,20 +134,32 @@ Data-Warehousing-Assignment/
 
 ---
 
-## How to Run
+## Setup Instructions
 This project is divided into 3 main execution phases:
 
 ### Phase 1: Setup Schema and User Roles
+
+### The Phase 1 needs to executed only one time and we do not need them again. You need to connect to postgres with root user privileges  
 
 Before running any ETL or loading scripts, the database must be initialized with the required schema, tables, and user roles.
 
 #### Step 1: Create Data Warehouse Schema and Tables
 
-Execute the following SQL file using any PostgreSQL-compatible tool (`psql`, `pgAdmin`, `DBeaver`, etc.):
+
+
+Execute the following SQL file using any PostgreSQL-compatible tool (`psql`, `pgAdmin`, etc.):
+bash
+```
+\i CREATE DATABASE "DW_DB";
+
+```
+This will create the Database DW_DB.
+
 bash
 ```
 \i 01_DW_schema_and_roles_creation/combined_dw_schema.sql
 ```
+* Make sure to use forward slash `/` in your path.
 
 This script will:
 - Create the `dw` schema if not exists
@@ -157,11 +169,15 @@ This script will:
 
 #### Step 2: Create User Roles and Permissions(Role Based Access)
 
+
+
 Connect to the postgre server as with Admin privilages, then execute the role setup script:
 bash
 ```
 \i 01_DW_schema_and_roles_creation/User_roles.sql
 ```
+* Make sure to use forward slash `/` in your path.
+
 This will:
 - Create roles:
   - `hr_user` – read access to HR tables and KPIs
@@ -171,13 +187,19 @@ This will:
 - Grant appropriate `CONNECT`, `USAGE`, and `SELECT`/`INSERT`/`CREATE TEMP` permissions
 - Ensure audit and DQ logs can be written by staging scripts
 
-* Make sure you connect to the correct `DW` database before running these scripts:
+* Make sure you connect to the correct `DW_DB` database before running these scripts:
 ```bash
-psql -U postgres -d DW
+psql -U postgres -d DW_DB
 ```
+
+
 
 ## Phase 2: Extract and Transform
 Run the combined Python ETL script:
+bash
+```
+pip install -r requirements.txt
+```
 
 bash
 ```
@@ -199,6 +221,7 @@ bash
 ```
 \i 03_load_into_fact_and_dim_tables/TL_combined.sql
 ```
+* Make sure to use forward slash `/` in your path.
 
 This will:
 - Load data into dimension tables with SCD2 logic (`dim_employee`)
@@ -241,7 +264,35 @@ These views rely only on **fact and dimension** tables and do not include any st
 
 These KPIs can now be queried by authorized roles (`hr_user`, `finance_user`, `super_user`) as per access control policies defined in `User_roles.sql`.
 
+---
+
+##  Outcomes & Summary of Work Done
+
+This project demonstrates the end-to-end process of building a dimensional data warehouse, extracting and transforming raw data, and delivering analytics-ready insights.
+
+###  Key Outcomes
+
+- **Designed a Star Schema** with clear dimensional modeling for HR, Finance, and Operations domains.
+- **Built robust ETL pipelines** using Python (for extract & transform) and SQL (for loading), incorporating:
+  - Data quality checks
+  - Audit logging
+  - Error handling for invalid formats, missing references, and duplicates
+- **Implemented SCD Type 2** for tracking historical changes in employee attributes.
+- **Created KPI Views** using SQL for:
+  - Headcount and attrition tracking
+  - Salary analysis
+  - Department-wise expenses
+  - Process and departmental downtime
+- **Enforced Role-Based Access** with PostgreSQL roles and grants for:
+  - HR users
+  - Finance users
+  - Super users
+  - Staging executors (for loading and DQ logging)
+- **Structured project files** across schema creation, ETL scripts, fact/dim load steps, and KPI queries.
+
+
+
 
 ## Improvement under way
-- DBT Migration: Move SQL logic into DBT.
+- DBT Migration: Move Transformation logic into DBT.
 - Power BI Integration: Build KPI dashboards using Power BI.

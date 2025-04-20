@@ -1,0 +1,7 @@
+pandas
+dbt-core
+dbt-postgres
+sqlalchemy
+sqlalchemy-utils
+numpy
+openpyxl
