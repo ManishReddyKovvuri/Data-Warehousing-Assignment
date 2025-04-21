@@ -129,7 +129,7 @@ Data-Warehousing-Assignment/
   - Each ETL stage writes a summary to `audit_log` with row counts
 - **SCD Type 2 for dim_employee**:
   - Changed rows expire previous records and insert new ones
-- **Incremental Inserts**:
+- **Incremental Loading**:
   - Fact tables insert only unique, non-duplicate records
 
 ---
