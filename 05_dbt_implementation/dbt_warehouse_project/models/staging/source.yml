@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: HR_Dataset_Dirty
+      - name: Finance_Dataset_Dirty
+      - name: Operations_Dataset_Dirty

@@ -110,7 +110,7 @@ INSERT INTO dw.audit_log (
 SELECT
   (SELECT job_id FROM temp_etl_job),
   'fact_employee',
-  'fact_load',
+  'load_fact_employee_snapshot',
   r.count,
   CASE WHEN r.count = 0 THEN 1 ELSE 0 END,
   CASE WHEN r.count = 0 THEN 'partial' ELSE 'success' END,

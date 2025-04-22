@@ -1,0 +1,22 @@
+EmployeeID,Name,Department,Gender,DateOfJoining,ManagerID,Salary,Status
+1001,Employee 1001,IT,M,2018-10-09,2003,94088,Resigned
+1002,Employee 1002,It,F,2017-03-06,2003,91466,Resigned
+1003,Employee 1003,,F,2022-03-02,2002,52179,Resigned
+1004,Employee 1004,IT,M,2016-01-03,2003,-10000,Resigned
+1005,Employee 1005,HR,M,15-01-2018,2002,115497,Active
+1006,Employee 1006,Operations,F,2022-02-09,2002,84898,Active
+1007,Employee 1007,HR,M,2019-01-10,2001,84167,Active
+1008,Employee 1008,Operations,M,2016-02-16,2001,94102,Resigned
+1009,Employee 1009,HR,M,2016-04-19,2003,107686,Resigned
+1010,Employee 1010,Marketing,F,2017-09-05,2003,78999,Active
+1011,Employee 1011,Marketing,M,2015-09-02,2002,54557,Resigned
+1012,Employee 1012,Marketing,M,2019-11-13,2001,72619,Active
+1013,Employee 1013,Operations,M,2019-05-09,2002,80337,Resigned
+1014,Employee 1014,Finance,M,2020-05-12,2002,105771,Active
+1015,Employee 1015,IT,F,2015-06-24,2001,87041,Resigned
+1016,Employee 1016,Marketing,M,2017-04-15,2001,99524,Resigned
+1017,Employee 1017,Finance,M,2019-08-13,2002,117150,Resigned
+1018,Employee 1018,Marketing,F,2017-08-13,2003,103744,Resigned
+1019,Employee 1019,IT,F,2016-10-11,2003,108972,Active
+1020,Employee 1020,Marketing,M,2017-02-20,2002,102227,Active
+1001,Employee 1001,IT,M,2018-10-09,2003,94088,Resigned
