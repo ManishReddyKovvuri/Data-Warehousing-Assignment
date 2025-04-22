@@ -27,7 +27,7 @@ GROUP BY t.year, t.month, t.day
 ORDER BY t.year, t.month, t.day;
 
 
---3. Average Salary by Gender
+--3. Current Average Salary by Gender
 CREATE OR REPLACE VIEW dw.vw_kpi_avg_salary_by_gender AS
 SELECT 
   e.gender,
@@ -73,6 +73,19 @@ JOIN dw.dim_department d ON e.department_id = d.department_id
 GROUP BY t.year, t.month, d.department_name, ex.expense_type_name
 ORDER BY t.year, t.month, d.department_name,ex.expense_type_name;
 
+--4c NEt Monthly Expenses by Expense type
+CREATE OR REPLACE VIEW dw.vw_kpi_net_monthly_expenses_by_expense AS
+SELECT 
+  t.year,
+  t.month,
+  ex.expense_type_name,
+  ROUND(SUM(f.expense_amount), 2) AS total_expense
+FROM dw.fact_expenses f
+JOIN dw.dim_time t ON f.time_id = t.time_id
+JOIN dw.dim_expense_type ex on f.expense_type_id = ex.expense_type_id
+JOIN dw.dim_employee e ON f.employee_sk = e.employee_sk
+GROUP BY t.year, t.month, ex.expense_type_name
+ORDER BY t.year, t.month,ex.expense_type_name;
 
 --5 downtime by process
 CREATE OR REPLACE VIEW dw.vw_kpi_downtime_by_process AS

@@ -64,6 +64,7 @@ def operations_etl_pipeline(job_id=None, engine=None):
         ops_df.dropna(subset=['downtime_hours'])
         .groupby(['department_name', 'process_name', 'location_name'])['downtime_hours']
         .mean()
+        .round(2)
         .reset_index()
         .rename(columns={'downtime_hours': 'avg_downtime_hours'})
     )

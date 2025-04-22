@@ -160,7 +160,7 @@ This will create the Database ETL_DB.
 
 * Make sure you connect to the correct `ETL_DB` database before running these scripts:
 
-if using psql run the below commands to connect and check the database connection:
+if using psql run the below commands to connect to the database connection:
 
 ```bash
 \c ETL_DB

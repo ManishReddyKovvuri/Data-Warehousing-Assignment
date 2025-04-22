@@ -189,14 +189,14 @@ WITH candidate_rows AS (
     ON t.full_date = s.expense_date::DATE
   JOIN dw.dim_employee e
     ON e.employee_id = s.employee_id AND e.is_current = TRUE
-),
-inserted_rows AS (
+),inserted_rows AS (
   SELECT *
   FROM candidate_rows cr
   WHERE NOT EXISTS (
     SELECT 1
     FROM dw.fact_expenses f
-    WHERE f.employee_sk = cr.employee_sk
+    JOIN dw.dim_employee e ON f.employee_sk = e.employee_sk
+    WHERE e.employee_id = cr.employee_id
       AND f.time_id = cr.time_id
       AND f.expense_type_id = cr.expense_type_id
       AND f.expense_amount = cr.expense_amount
