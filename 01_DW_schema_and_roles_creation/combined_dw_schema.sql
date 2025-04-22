@@ -143,10 +143,13 @@ CREATE TABLE IF NOT EXISTS dw.data_quality_log (
 
 
 
--- Staging Employee
-DROP TABLE IF EXISTS dw.staging_employee;
+-- Create schema
+CREATE SCHEMA IF NOT EXISTS stg;
 
-CREATE TABLE dw.staging_employee (
+-- Staging Employee
+DROP TABLE IF EXISTS stg.staging_employee;
+
+CREATE TABLE stg.staging_employee (
   "EmployeeID" TEXT,
   "Name" TEXT,
   "Gender" TEXT,
@@ -159,9 +162,9 @@ CREATE TABLE dw.staging_employee (
 
 
 -- Staging table for Finance data
-DROP TABLE IF EXISTS dw.staging_finance;
+DROP TABLE IF EXISTS stg.staging_finance;
 
-CREATE TABLE dw.staging_finance (
+CREATE TABLE stg.staging_finance (
   employee_id TEXT,
   expense_type TEXT,
   expense_amount NUMERIC(12, 2),
@@ -172,9 +175,9 @@ CREATE TABLE dw.staging_finance (
 
 
 -- Staging Table for Operations
-DROP TABLE IF EXISTS dw.staging_operations;
+DROP TABLE IF EXISTS stg.staging_operations;
 
-CREATE TABLE dw.staging_operations (
+CREATE TABLE stg.staging_operations (
   department_name TEXT,
   process_name TEXT,
   location_name TEXT,

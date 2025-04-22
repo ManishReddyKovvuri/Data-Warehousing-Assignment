@@ -55,7 +55,7 @@ models:
 
 seeds:
   dbt_warehouse_project:
-    +schema: raw      # all seeds will land in schema raw.*
+    +schema: raw      
 
 
 dispatch:

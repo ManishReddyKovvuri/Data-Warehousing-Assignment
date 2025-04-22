@@ -29,13 +29,16 @@ def hr_etl_pipeline(job_id=None, engine=None):
     original_gender = hr_df['Gender'].astype(str).str.strip().str.upper()
     gender_map = {'m': 'M', 'MALE': 'M', 'f': 'F', 'FEMALE': 'F'}
     hr_df['Gender'] = original_gender.replace(gender_map)
-    hr_df['Gender'] = hr_df['Gender'].apply(lambda x: x if x in ['M', 'F'] else 'UNKNOWN')
+    
 
     for i, val in enumerate(original_gender):
         if val not in gender_map and val not in ['M', 'F']:
             dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'Gender',
                         'row_reference': hr_df.at[i, 'EmployeeID'], 'original_value': val,
                         'issue': 'Unknown gender, set to UNKNOWN'})
+            hr_df.at[i, 'Gender'] = 'UNKNOWN'
+
+    # hr_df['Gender'] = hr_df['Gender'].apply(lambda x: x if x in ['M', 'F'] else 'UNKNOWN')
 
     # DateOfJoining
     def fix_date(date_val, row_index):
@@ -54,6 +57,26 @@ def hr_etl_pipeline(job_id=None, engine=None):
 
     # ManagerID
     hr_df['ManagerID'] = hr_df['ManagerID'].astype(str).str.strip()
+
+    hr_df['ManagerID'] = hr_df['ManagerID'].apply(
+        lambda x: str(int(x)) if pd.notna(x) and isinstance(x, float) and x.is_integer() else str(x)
+    ).str.strip()
+
+    
+    for i, val in enumerate(hr_df['ManagerID']):
+        if val in ['nan', 'NaN', '', 'None']:# 'UNKNOWN':
+            dq_log.append({
+                'job_id': job_id,
+                'table_name': 'raw_hr',
+                'column_name': 'ManagerID',
+                'row_reference': hr_df.at[i, 'EmployeeID'],
+                'original_value': hr_df.at[i, 'ApprovedBy'],
+                'issue': 'Missing or invalid ManagerID, set to UNKNOWN'
+            })
+            hr_df.at[i, 'ManagerID'] = 'UNKNOWN'
+    
+
+
 
     # Salary
     hr_df['Salary'] = pd.to_numeric(hr_df['Salary'], errors='coerce')
@@ -90,11 +113,28 @@ def hr_etl_pipeline(job_id=None, engine=None):
     # Drop helper column
     hr_df.drop(columns=['row_number'], inplace=True)
 
+
+
+    dropped_records = hr_df[hr_df.duplicated()]
+
     # Remove  duplicates
     hr_df_cleaned = hr_df.drop_duplicates()
 
+    if not dropped_records.empty:
+        for idx, row in dropped_records.iterrows():
+            dq_log.append({
+                'job_id': job_id,
+                'table_name': 'raw_hr',
+                'column_name': 'ALL_COLUMNS',
+                'row_reference': row['EmployeeID'],
+                'original_value': str(row.to_dict()),
+                'issue': 'Duplicate row dropped'
+            })
+    
+    
+
     # Save staging table 
-    hr_df_cleaned.to_sql("staging_employee", engine, schema="dw", if_exists="replace", index=False)
+    hr_df_cleaned.to_sql("staging_employee", engine, schema="stg", if_exists="replace", index=False)
 
     # Save DQ logs
     pd.DataFrame(dq_log).to_sql("data_quality_log", engine, schema="dw", if_exists="append", index=False)
@@ -168,26 +208,52 @@ def finance_etl_pipeline(job_id=None, engine=None):
     finance_df['approved_by'] = finance_df['ApprovedBy'].apply(
         lambda x: str(int(x)) if pd.notna(x) and isinstance(x, float) and x.is_integer() else str(x)
     ).str.strip()
-    finance_df['approved_by'] = finance_df['approved_by'].replace(['nan', 'NaN', '', 'None'], 'UNKNOWN')
+    # finance_df['approved_by'] = finance_df['approved_by'].replace(['nan', 'NaN', '', 'None'], 'UNKNOWN')
     for i, val in enumerate(finance_df['approved_by']):
-        if val == 'UNKNOWN':
+        if val in ['nan', 'NaN', '', 'None']:
             dq_log.append({
                 'job_id': job_id,
-                'table_name': 'staging_finance',
+                'table_name': 'raw_finance',
                 'column_name': 'approved_by',
                 'row_reference': finance_df.at[i, 'EmployeeID'],
                 'original_value': finance_df.at[i, 'ApprovedBy'],
-                'issue': 'Missing or invalid approved_by, set to NULL'
+                'issue': 'Missing or invalid approved_by, set to UNKNOWN'
             })
-
+            finance_df.at[i, 'approved_by'] = 'UNKNOWN'
 
     # Prepare final staging columns
     finance_df['employee_id'] = finance_df['EmployeeID'].astype(str).str.strip()
     finance_df = finance_df[['employee_id', 'expense_type', 'expense_amount', 'expense_date', 'approved_by', 'is_refund']]
-    finance_df.drop_duplicates(inplace=True)
+   
+
+
+    dropped_records = finance_df[finance_df.duplicated()]
+
+    finance_df.drop_duplicates()
+
+    if not dropped_records.empty:
+        for idx, row in dropped_records.iterrows():
+            dq_log.append({
+                'job_id': job_id,
+                'table_name': 'raw_finance',
+                'column_name': 'ALL_COLUMNS',
+                'row_reference': row['EmployeeID'],
+                'original_value': str(row.to_dict()),
+                'issue': 'Duplicate row dropped'
+            })
+
+    # Log DQ
+    pd.DataFrame(dq_log).to_sql("data_quality_log", engine, schema="dw", if_exists="append", index=False)
+
+
+
+
 
     # Load to staging
-    finance_df.to_sql("staging_finance", engine, schema="dw", if_exists="replace", index=False)
+    finance_df.to_sql("staging_finance", engine, schema="stg", if_exists="replace", index=False)
+
+
+    
 
     # Log DQ
     pd.DataFrame(dq_log).to_sql("data_quality_log", engine, schema="dw", if_exists="append", index=False)
@@ -205,7 +271,7 @@ def finance_etl_pipeline(job_id=None, engine=None):
         'rows_processed': rows_processed,
         'rows_failed': rows_failed,
         'status': status,
-        'message': f'Finance data cleaned. Processed: {rows_processed}, Failed: {rows_failed}, DQ Issues: {len(dq_log)}'
+        'message': f' Processed: {rows_processed}, Failed: {rows_failed}, DQ Issues: {len(dq_log)}'
     }])
     audit_log.to_sql('audit_log', engine, schema='dw', if_exists='append', index=False)
 
@@ -223,47 +289,45 @@ def operations_etl_pipeline(job_id=None, engine=None):
 
     # Clean Department
     ops_df['department_name'] = ops_df['Department'].astype(str).str.strip().str.upper()
-    ops_df['department_name'] = ops_df['department_name'].replace(
-        ['', 'NAN', 'NaN', 'nan'], 'UNASSIGNED_DEPT'
-    ).fillna('UNASSIGNED_DEPT')
-    ops_df['department_name'] = ops_df['department_name'].fillna('UNASSIGNED_DEPT')
+
+    # ops_df['department_name'] = ops_df['department_name'].fillna('UNASSIGNED_DEPT')
 
     for i, val in enumerate(ops_df['department_name']):
-        if val=='UNASSIGNED_DEPT':
+        if val in ['', 'NAN', 'NaN', 'nan']:#=='UNASSIGNED_DEPT':
             dq_log.append({
                 'job_id': job_id, 'table_name': 'raw_operations', 'column_name': 'department_name',
                 'row_reference': str(i + 1), 'original_value': ops_df.at[i, 'department_name'],
                 'issue': 'Department Name is empty, defaulted to UNASSIGNED_DEPT'
             })
+            ops_df.at[i, 'department_name'] = 'UNASSIGNED_DEPT' 
 
 
 
 
-    # Clean Process
+
+
+    # Clean Process Name
     ops_df['process_name'] = ops_df['ProcessName'].astype(str).str.strip().str.upper()
-    ops_df['process_name'] = ops_df['process_name'].replace(
-        ['', 'NAN', 'NaN'], 'UNKNOWN_PROCESS'
-    )
     for i, val in enumerate(ops_df['process_name']):
-        if val=='UNKNOWN_PROCESS':
+        if val in ['', 'NAN', 'NaN'] :
             dq_log.append({
                 'job_id': job_id, 'table_name': 'raw_operations', 'column_name': 'process_name',
                 'row_reference': str(i + 1), 'original_value': ops_df.at[i, 'process_name'],
                 'issue': 'Process Name is empty, defaulted to UNKNOWN_PROCESS'
             })
+            ops_df.at[i, 'process_name'] = 'UNKNOWN_PROCESS'
 
     # Clean Location
     ops_df['location_name'] = ops_df['Location'].astype(str).str.strip().str.upper()
-    ops_df['location_name'] = ops_df['location_name'].replace(
-        ['', 'NAN', 'NaN'], 'UNKNOWN_LOCATION'
-    )
+   
     for i, val in enumerate(ops_df['location_name']):
-        if val=='UNKNOWN_LOCATION':
+        if val in ['', 'NAN', 'NaN']:
             dq_log.append({
                 'job_id': job_id, 'table_name': 'raw_operations', 'column_name': 'location_name',
                 'row_reference': str(i + 1), 'original_value': ops_df.at[i, 'location_name'],
                 'issue': 'Location Name is empty, defaulted to UNKNOWN_LOCATION'
             })
+            ops_df.at[i, 'location_name'] = 'UNKNOWN_LOCATION'
 
     # Clean downtime_hours
     ops_df['downtime_hours'] = pd.to_numeric(ops_df['DowntimeHours'], errors='coerce')
@@ -315,10 +379,26 @@ def operations_etl_pipeline(job_id=None, engine=None):
         'department_name', 'process_name', 'location_name',
         'process_date', 'downtime_hours'
     ]]
-    ops_df.drop_duplicates(inplace=True)
 
+
+    dropped_records = ops_df[ops_df.duplicated()]
+
+    # Remove  duplicates
+    ops_df = ops_df.drop_duplicates()
+
+    if not dropped_records.empty:
+        for idx, row in dropped_records.iterrows():
+            dq_log.append({
+                'job_id': job_id,
+                'table_name': 'raw_operations',
+                'column_name': 'ALL_COLUMNS',
+                'row_reference': idx,
+                'original_value': str(row.to_dict()),
+                'issue': 'Duplicate row dropped'
+            })
+    
     # Load to staging
-    ops_df.to_sql("staging_operations", engine, schema="dw", if_exists="replace", index=False)
+    ops_df.to_sql("staging_operations", engine, schema="stg", if_exists="replace", index=False)
 
     # Save DQ log
     if dq_log:

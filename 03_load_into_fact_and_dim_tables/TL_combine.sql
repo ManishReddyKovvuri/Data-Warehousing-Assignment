@@ -14,27 +14,27 @@ END $$;
 --  Insert new departments from staging to dim_department
 INSERT INTO dw.dim_department (department_name)
 SELECT DISTINCT UPPER(TRIM("Department"))
-FROM dw.staging_employee
+FROM stg.staging_employee
 WHERE UPPER(TRIM("Department")) NOT IN (
   SELECT UPPER(TRIM(department_name)) FROM dw.dim_department
 );
 
 --  Add row_hash to staging if not exists
 DO $$ BEGIN
-    ALTER TABLE dw.staging_employee ADD COLUMN row_hash TEXT;
+    ALTER TABLE stg.staging_employee ADD COLUMN row_hash TEXT;
 EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'column row_hash already exists, skipping';
 END $$;
 
-UPDATE dw.staging_employee
+UPDATE stg.staging_employee
 SET row_hash = md5(concat_ws('::', "Name", "Gender", "DateOfJoining", "ManagerID", "Department", "Salary", "Status"));
 
 --  Map department_id from dim_department into staging_employee
 DO $$ BEGIN
-    ALTER TABLE dw.staging_employee ADD COLUMN department_id INT;
+    ALTER TABLE stg.staging_employee ADD COLUMN department_id INT;
 EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'department_id already exists, skipping';
 END $$;
 
-UPDATE dw.staging_employee s
+UPDATE stg.staging_employee s
 SET department_id = d.department_id
 FROM dw.dim_department d
 WHERE UPPER(s."Department") = UPPER(d.department_name);
@@ -43,7 +43,7 @@ WHERE UPPER(s."Department") = UPPER(d.department_name);
 UPDATE dw.dim_employee d
 SET valid_to = CURRENT_DATE,
     is_current = FALSE
-FROM dw.staging_employee s
+FROM stg.staging_employee s
 WHERE d.employee_id::TEXT = s."EmployeeID"::TEXT
   AND d.is_current = TRUE
   AND d.row_hash IS DISTINCT FROM s.row_hash;
@@ -56,7 +56,7 @@ INSERT INTO dw.dim_employee (
 SELECT
   s."EmployeeID"::TEXT, s."Name", s."Gender", s."DateOfJoining"::DATE, s."ManagerID"::TEXT,
   s.department_id, s.row_hash, CURRENT_DATE, NULL, TRUE
-FROM dw.staging_employee s
+FROM stg.staging_employee s
 LEFT JOIN dw.dim_employee d
   ON s."EmployeeID"::TEXT = d.employee_id::TEXT AND d.is_current = TRUE
 WHERE d.row_hash IS DISTINCT FROM s.row_hash OR d.row_hash IS NULL;
@@ -87,12 +87,9 @@ INSERT INTO dw.fact_employee (
   employee_sk, time_id, salary, status
 )
 SELECT
-  e.employee_sk,
-  t.time_id,
-  s."Salary",
-  s."Status"
+  e.employee_sk, t.time_id, s."Salary", s."Status"
 FROM dw.dim_employee e
-JOIN dw.staging_employee s
+JOIN stg.staging_employee s
   ON e.employee_id::TEXT = s."EmployeeID"::TEXT
   AND e.is_current = TRUE
 JOIN dw.dim_time t
@@ -123,19 +120,19 @@ FROM inserted_rows r;
 --  Insert new expense types into dim_expense_type
 INSERT INTO dw.dim_expense_type (expense_type_name)
 SELECT DISTINCT UPPER(TRIM(expense_type))
-FROM dw.staging_finance
+FROM stg.staging_finance
 WHERE UPPER(TRIM(expense_type)) NOT IN (
   SELECT UPPER(TRIM(expense_type_name)) FROM dw.dim_expense_type
 );
 
 -- Add expense_type_id to staging if not exists
 DO $$ BEGIN
-    ALTER TABLE dw.staging_finance ADD COLUMN expense_type_id INT;
+    ALTER TABLE stg.staging_finance ADD COLUMN expense_type_id INT;
 EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'column expense_type_id already exists, skipping';
 END $$;
 
 -- Map expense_type_id from dim_expense_type
-UPDATE dw.staging_finance s
+UPDATE stg.staging_finance s
 SET expense_type_id = d.expense_type_id
 FROM dw.dim_expense_type d
 WHERE UPPER(TRIM(s.expense_type)) = UPPER(TRIM(d.expense_type_name));
@@ -150,7 +147,7 @@ SELECT
   s.employee_id,
   s.employee_id,
   'EmployeeID not found in dim_employee'
-FROM dw.staging_finance s
+FROM stg.staging_finance s
 LEFT JOIN dw.dim_employee e
   ON s.employee_id = e.employee_id AND e.is_current = TRUE
 WHERE e.employee_id IS NULL;
@@ -169,7 +166,7 @@ SELECT
   COUNT(*),
   CASE WHEN COUNT(*) = 0 THEN 'success' ELSE 'partial' END,
   'EmployeeID lookup validation against dim_employee completed'
-FROM dw.staging_finance s
+FROM stg.staging_finance s
 LEFT JOIN dw.dim_employee e
   ON s.employee_id = e.employee_id AND e.is_current = TRUE
 WHERE e.employee_id IS NULL;
@@ -184,7 +181,7 @@ WITH candidate_rows AS (
     t.time_id,
     s.is_refund,
     e.employee_sk
-  FROM dw.staging_finance s
+  FROM stg.staging_finance s
   JOIN dw.dim_time t
     ON t.full_date = s.expense_date::DATE
   JOIN dw.dim_employee e
@@ -243,14 +240,14 @@ SELECT
 --  Insert new process names into dim_process
 INSERT INTO dw.dim_process (process_name)
 SELECT DISTINCT process_name
-FROM dw.staging_operations
+FROM stg.staging_operations
 WHERE process_name NOT IN (
   SELECT process_name FROM dw.dim_process
 );
 
 INSERT INTO dw.dim_department (department_name)
 SELECT DISTINCT department_name
-FROM dw.staging_operations
+FROM stg.staging_operations
 WHERE department_name NOT IN (
   SELECT department_name FROM dw.dim_department
 );
@@ -258,39 +255,39 @@ WHERE department_name NOT IN (
 -- Insert new locations into dim_location
 INSERT INTO dw.dim_location (location_name)
 SELECT DISTINCT location_name
-FROM dw.staging_operations
+FROM stg.staging_operations
 WHERE location_name NOT IN (
   SELECT location_name FROM dw.dim_location
 );
 
 --  Add foreign keys to staging if not exists
 DO $$ BEGIN
-  ALTER TABLE dw.staging_operations ADD COLUMN process_id INT;
+  ALTER TABLE stg.staging_operations ADD COLUMN process_id INT;
 EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'process_id already exists';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE dw.staging_operations ADD COLUMN location_id INT;
+  ALTER TABLE stg.staging_operations ADD COLUMN location_id INT;
 EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'location_id already exists';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE dw.staging_operations ADD COLUMN department_id INT;
+  ALTER TABLE stg.staging_operations ADD COLUMN department_id INT;
 EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'department_id already exists';
 END $$;
 
 -- Map dim IDs to staging
-UPDATE dw.staging_operations s
+UPDATE stg.staging_operations s
 SET process_id = p.process_id
 FROM dw.dim_process p
 WHERE s.process_name = p.process_name;
 
-UPDATE dw.staging_operations s
+UPDATE stg.staging_operations s
 SET location_id = l.location_id
 FROM dw.dim_location l
 WHERE s.location_name = l.location_name;
 
-UPDATE dw.staging_operations s
+UPDATE stg.staging_operations s
 SET department_id = d.department_id
 FROM dw.dim_department d
 WHERE s.department_name = d.department_name;
@@ -305,7 +302,7 @@ WITH candidate_rows AS (
     s.location_id,
     t.time_id,
     s.downtime_hours
-  FROM dw.staging_operations s
+  FROM stg.staging_operations s
   JOIN dw.dim_time t
     ON t.full_date = s.process_date::DATE
 ),

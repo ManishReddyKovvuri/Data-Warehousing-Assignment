@@ -34,27 +34,27 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA dw TO super_user;
 
 
 
---Allow usage of the schema
--- GRANT USAGE,CREATE ON SCHEMA dw TO staging_executor;
+--Allow usage 
+-- GRANT USAGE,CREATE ON SCHEMA raw TO staging_executor;
 
 -- -- Run as admin
--- ALTER TABLE dw.staging_employee OWNER TO staging_executor;
--- ALTER TABLE dw.staging_finance OWNER TO staging_executor;
--- ALTER TABLE dw.staging_operations OWNER TO staging_executor;
+-- ALTER TABLE raw.staging_employee OWNER TO staging_executor;
+-- ALTER TABLE raw.staging_finance OWNER TO staging_executor;
+-- ALTER TABLE raw.staging_operations OWNER TO staging_executor;
 
 
 -- --Allow R/W access to all staging tables
--- GRANT  SELECT, INSERT, UPDATE, DELETE ON dw.staging_employee TO staging_executor;
--- GRANT SELECT, INSERT, UPDATE, DELETE ON dw.staging_finance TO staging_executor;
--- GRANT SELECT, INSERT, UPDATE, DELETE ON dw.staging_operations TO staging_executor;
--- GRANT SELECT,INSERT ON dw.data_quality_log TO staging_executor;
--- GRANT SELECT,INSERT ON dw.audit_log TO staging_executor;
+-- GRANT  SELECT, INSERT, UPDATE, DELETE ON raw.staging_employee TO staging_executor;
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON raw.staging_finance TO staging_executor;
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON raw.staging_operations TO staging_executor;
+-- GRANT SELECT,INSERT ON raw.data_quality_log TO staging_executor;
+-- GRANT SELECT,INSERT ON raw.audit_log TO staging_executor;
 
 -- -- Grant read-only access to dimension tables 
--- GRANT SELECT ON dw.dim_department TO staging_executor;
--- GRANT SELECT ON dw.dim_expense_type TO staging_executor;
--- GRANT SELECT ON dw.dim_time TO staging_executor;
--- GRANT SELECT ON dw.dim_location TO staging_executor;
--- GRANT SELECT ON dw.dim_process TO staging_executor;
+-- GRANT SELECT ON raw.dim_department TO staging_executor;
+-- GRANT SELECT ON raw.dim_expense_type TO staging_executor;
+-- GRANT SELECT ON raw.dim_time TO staging_executor;
+-- GRANT SELECT ON raw.dim_location TO staging_executor;
+-- GRANT SELECT ON raw.dim_process TO staging_executor;
 
 
