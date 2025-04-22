@@ -1,3 +1,6 @@
 __pycache__/
 .vscode/
 .dae
+target/
+dbt_packages/
+logs/

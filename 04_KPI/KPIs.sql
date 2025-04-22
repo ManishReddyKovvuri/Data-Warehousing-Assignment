@@ -4,12 +4,13 @@ CREATE OR REPLACE VIEW dw.vw_kpi_headcount AS
 SELECT 
   t.year,
   t.month,
+  t.day,
   COUNT(DISTINCT f.employee_sk) AS Active_Headcount
 FROM dw.fact_employee f
 JOIN dw.dim_time t ON f.time_id = t.time_id
 WHERE f.status = 'Active'
-GROUP BY t.year, t.month
-ORDER BY t.year, t.month;
+GROUP BY t.year, t.month,t.day
+ORDER BY t.year, t.month, t.day;
 
 
 --2. Attrition Over Time
@@ -17,12 +18,13 @@ CREATE OR REPLACE VIEW dw.vw_kpi_resignations AS
 SELECT 
   t.year,
   t.month,
-  COUNT(*) AS resignations
+  t.day,
+  COUNT(DISTINCT f.employee_sk) AS resignations
 FROM dw.fact_employee f
 JOIN dw.dim_time t ON f.time_id = t.time_id
 WHERE f.status = 'Resigned'
-GROUP BY t.year, t.month
-ORDER BY t.year, t.month;
+GROUP BY t.year, t.month, t.day
+ORDER BY t.year, t.month, t.day;
 
 
 --3. Average Salary by Gender
@@ -96,3 +98,10 @@ ORDER BY total_downtime DESC;
 
 
 
+
+GRANT SELECT ON dw.vw_kpi_headcount TO hr_user;
+GRANT SELECT ON dw.vw_kpi_resignations TO hr_user;
+GRANT SELECT ON dw.vw_kpi_avg_salary_by_gender TO hr_user;
+
+GRANT SELECT ON dw.vw_kpi_gross_monthly_expenses_by_dept TO finance_user;
+GRANT SELECT ON dw.vw_kpi_net_monthly_expenses_by_dept TO finance_user;

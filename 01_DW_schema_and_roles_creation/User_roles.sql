@@ -6,10 +6,10 @@ CREATE ROLE super_user LOGIN PASSWORD 'super_pass';
 -- CREATE ROLE staging_executor LOGIN PASSWORD 'stage_pass';
 
 
-GRANT CONNECT ON DATABASE "DW_DB" TO hr_user;
-GRANT CONNECT ON DATABASE "DW_DB" TO finance_user;
-GRANT CONNECT ON DATABASE "DW_DB" TO super_user;
--- GRANT CONNECT, TEMP ON DATABASE "DW_DB" TO staging_executor;
+GRANT CONNECT ON DATABASE "ETL_DB" TO hr_user;
+GRANT CONNECT ON DATABASE "ETL_DB" TO finance_user;
+GRANT CONNECT ON DATABASE "ETL_DB" TO super_user;
+-- GRANT CONNECT, TEMP ON DATABASE "ETL_DB" TO staging_executor;
 
 
 -- HR access
@@ -33,12 +33,6 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA dw TO super_user;
 
 
 
-GRANT SELECT ON dw.vw_kpi_headcount TO hr_user;
-GRANT SELECT ON dw.vw_kpi_resignations TO hr_user;
-GRANT SELECT ON dw.vw_kpi_avg_salary_by_gender TO hr_user;
-
-GRANT SELECT ON dw.vw_kpi_gross_monthly_expenses_by_dept TO finance_user;
-GRANT SELECT ON dw.vw_kpi_net_monthly_expenses_by_dept TO finance_user;
 
 --Allow usage of the schema
 -- GRANT USAGE,CREATE ON SCHEMA dw TO staging_executor;

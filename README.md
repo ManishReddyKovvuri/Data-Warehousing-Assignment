@@ -148,16 +148,27 @@ Before running any ETL or loading scripts, the database must be initialized with
 
 
 Execute the following SQL file using any PostgreSQL-compatible tool (`psql`, `pgAdmin`, etc.):
-bash
-```
-\i CREATE DATABASE "DW_DB";
 
-```
-This will create the Database DW_DB.
+Connect to the postgre server as with Admin privilages, then execute these scripts:
 
 bash
 ```
-\i 01_DW_schema_and_roles_creation/combined_dw_schema.sql
+ CREATE DATABASE "ETL_DB";
+```
+
+This will create the Database ETL_DB.
+
+* Make sure you connect to the correct `ETL_DB` database before running these scripts:
+
+if using psql run the below commands to connect and check the database connection:
+
+```bash
+\c ETL_DB
+```
+
+bash
+```
+\i <path>/01_DW_schema_and_roles_creation/combined_dw_schema.sql
 ```
 * Make sure to use forward slash `/` in your path.
 
@@ -169,12 +180,8 @@ This script will:
 
 #### Step 2: Create User Roles and Permissions(Role Based Access)
 
-
-
-Connect to the postgre server as with Admin privilages, then execute the role setup script:
-bash
-```
-\i 01_DW_schema_and_roles_creation/User_roles.sql
+```bash
+\i <path>/01_DW_schema_and_roles_creation/User_roles.sql
 ```
 * Make sure to use forward slash `/` in your path.
 
@@ -187,23 +194,32 @@ This will:
 - Grant appropriate `CONNECT`, `USAGE`, and `SELECT`/`INSERT`/`CREATE TEMP` permissions
 - Ensure audit and DQ logs can be written by staging scripts
 
-* Make sure you connect to the correct `DW_DB` database before running these scripts:
-```bash
-psql -U postgres -d DW_DB
-```
+
+####  User Role Matrix
+
+| Username          | Role Purpose                               | Password   |  
+|-------------------|---------------------------------------------|--------------|
+| `hr_user`         | HR analysts / viewers                       | `hr_pass`    |
+| `finance_user`    | Finance analysts / controllers              | `fin_pass`   |
+| `super_user`      | Admins and full-access users                | `super_pass` |
+| `staging_executor`| ETL script executor (staging inserts only) | `stage_pass`  |
+
+ \i C:/Users/kovvu/OneDrive/Desktop/Projects/Data-Warehousing-Assignment/01_DW_schema_and_roles_creation/combined_dw_schema.sql
+
+
 
 
 
 ## Phase 2: Extract and Transform
 Run the combined Python ETL script:
-bash
-```
+
+```bash
 pip install -r requirements.txt
 ```
 
-bash
-```
-python 02_Extract_and_transform_raw_data/ETL_combined.py
+
+```bash
+python 02_Extract_and_transform_raw_data/ET_combined.py
 ```
 
  This will:
@@ -219,7 +235,7 @@ python 02_Extract_and_transform_raw_data/ETL_combined.py
 Run the SQL loader script using a PostgreSQL client like psql, pgAdmin, or DBeaver:
 bash
 ```
-\i 03_load_into_fact_and_dim_tables/TL_combined.sql
+\i <path>/03_load_into_fact_and_dim_tables/TL_combined.sql
 ```
 * Make sure to use forward slash `/` in your path.
 
@@ -239,11 +255,11 @@ To simplify reporting and maintain separation of concerns, all KPI metrics are e
 
 ####  Run the View Creation Script
 
-Use your PostgreSQL client (e.g. DBeaver, `psql`, `pgAdmin`) to execute the following script:
+Use your PostgreSQL client (e.g. `psql`, `pgAdmin`) to execute the following script:
 
-bash
-```
-\i 04_KPI/KPIs.sql
+
+```bash
+\i <path>/04_KPI/KPIs.sql
 ```
 
 This script creates the following views:
@@ -266,6 +282,127 @@ These KPIs can now be queried by authorized roles (`hr_user`, `finance_user`, `s
 
 ---
 
+---
+
+## End-to-End Pipeline Overview
+
+The following diagram summarizes the full data pipeline implemented in **Phases 1 to 4**, covering:
+
+- Schema creation and user role setup
+- Python-based extraction and transformation
+- Staging layer population
+- Dimensional model loading with SCD Type 2
+- Logging mechanisms (audit and data quality)
+- Final KPI views consumed by BI tools
+
+This visual helps understand the logical and data flow across all layers of the solution:
+
+```mermaid
+flowchart TD
+    %% Source Systems
+    subgraph "Source Systems"
+        HR["HR_Dataset_Dirty.xlsx"]:::sourceetl
+        Finance["Finance_Dataset_Dirty.xlsx"]:::sourceetl
+        Ops["Operations_Dataset_Dirty.xlsx"]:::sourceetl
+    end
+
+    %% ETL Layer
+    subgraph "ETL Layer"
+        A2["Python ETL - HR"]:::sourceetl
+        B2["Python ETL - Finance"]:::sourceetl
+        C2["Python ETL - Operations"]:::sourceetl
+        ETComb["ETL Orchestration"]:::sourceetl
+    end
+
+    %% Staging Area
+    subgraph "Staging Area"
+        SE["dw.staging_employee"]:::staging
+        SF["dw.staging_finance"]:::staging
+        SO["dw.staging_operations"]:::staging
+    end
+
+    %% Data Warehouse Load
+    subgraph "Data Warehouse Load"
+        DEmp["dw.dim_employee (SCD2)"]:::warehouse
+        DOps["dw.dim_operations"]:::warehouse
+        FExp["dw.fact_expenses"]:::warehouse
+        FComb["dw.fact_combined"]:::warehouse
+    end
+
+    %% Logging & Monitoring
+    subgraph "Logging & Monitoring"
+        DQ["dw.data_quality_log"]:::logging
+        Audit["dw.audit_log"]:::logging
+    end
+
+    %% Presentation Layer
+    subgraph "Presentation Layer"
+        KPI["KPI Views"]:::presentation
+        Users["BI Tools / Users"]:::presentation
+    end
+
+    
+    %% Data Flows
+    HR -->|reads| A2
+    Finance -->|reads| B2
+    Ops -->|reads| C2
+
+    ETComb --> A2
+    ETComb --> B2
+    ETComb --> C2
+
+    A2 -->|writes| SE
+    B2 -->|writes| SF
+    C2 -->|writes| SO
+
+    A2 -->|logs DQ| DQ
+    B2 -->|logs DQ| DQ
+    C2 -->|logs DQ| DQ
+
+    SE -->|SCD2 logic| DEmp
+    SF -->|loads| FExp
+    SO -->|loads| DOps
+
+    DEmp -->|loads| FComb
+    FExp -->|combines| FComb
+    DOps -->|combines| FComb
+
+    DEmp -->|logs Audit| Audit
+    FExp -->|logs Audit| Audit
+    DOps -->|logs Audit| Audit
+    FComb -->|logs Audit| Audit
+
+    DEmp --> KPI
+    FExp --> KPI
+    DOps --> KPI
+    FComb --> KPI
+
+    KPI --> Users
+
+    %% Click Events
+    click A2 "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/02_Extract_and_transform_raw_data/A2_hr_etl.py"
+    click B2 "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/02_Extract_and_transform_raw_data/B2_finance_etl.py"
+    click C2 "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/02_Extract_and_transform_raw_data/C2_ops_etl.py"
+    click ETComb "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/02_Extract_and_transform_raw_data/ET_combined.py"
+    click DEmp "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/03_load_into_fact_and_dim_tables/A3_load_dim_emp.sql"
+    click DOps "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/03_load_into_fact_and_dim_tables/C3_load_dim_ops.sql"
+    click FExp "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/03_load_into_fact_and_dim_tables/B3_load_fin_facts.sql"
+    click FComb "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/03_load_into_fact_and_dim_tables/TL_combine.sql"
+    click KPI "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/04_KPI/KPIs.sql"
+    click Req "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/requirements.txt"
+    click RD "https://github.com/manishreddykovvuri/data-warehousing-assignment/blob/main/README.md"
+
+    %% Styles
+    classDef sourceetl fill:#ADD8E6,stroke:#333,stroke-width:1px
+    classDef staging fill:#FFA500,stroke:#333,stroke-width:1px
+    classDef warehouse fill:#90EE90,stroke:#333,stroke-width:1px
+    classDef presentation fill:#DDA0DD,stroke:#333,stroke-width:1px
+    classDef logging fill:#D3D3D3,stroke:#333,stroke-width:1px
+```
+
+
+
+---
 ##  Outcomes & Summary of Work Done
 
 This project demonstrates the end-to-end process of building a dimensional data warehouse, extracting and transforming raw data, and delivering analytics-ready insights.
@@ -291,8 +428,45 @@ This project demonstrates the end-to-end process of building a dimensional data 
 - **Structured project files** across schema creation, ETL scripts, fact/dim load steps, and KPI queries.
 
 
+### Phase 5: DBT Transformation
 
+Unlike the Python-based ETL used in earlier phases, this stage uses **DBT** to implement an **ELT** approach.
+
+- **ETL vs ELT**: Previously, transformations were done before loading (ETL). DBT enables you to **extract and load first**, then **transform directly inside the data warehouse**.
+- **Warehouse-Powered Processing**: All transformation logic is performed using the **compute power of the PostgreSQL data warehouse or any warehouse of choice**, improving scalability and traceability.
+- **Modularity & Reusability**: DBT makes SQL logic modular with version control, testing, and environment-based runs.
+
+To install DBT core:
+
+```bash
+pip install dbt-core dbt-postgres
+```
+
+
+```bash
+dbt seed --full-refresh          # Load raw dirty CSVs into raw schema
+
+# Transform to staging views
+dbt run --select staging         # Clean + standardized staging models
+
+# Build dims and fact tables
+dbt run --select dims            # Materialize dimension tables
+
+# Populate facts with SCD2 awareness and incremental logic
+dbt snapshot                     # Build dim_employee as SCD2 snapshot
+
+# Run fact models with audit/date logic
+dbt run --select facts
+```
+This phase 5 implements the following improvements:
+- **DBT Migration**: All logic modularized into DBT folders
+- **Incremental Loads**: Only new rows are added to facts
+- **SCD2 in Snapshots**: `dim_employee` tracks history using `dbt_valid_from` / `dbt_valid_to`
 
 ## Improvement under way
-- DBT Migration: Move Transformation logic into DBT.
-- Power BI Integration: Build KPI dashboards using Power BI.
+- **DBT Migration**: 
+  - **Audit Logging**: Fact and dim models log job runs in `dw.audit_log`
+  - **Data Quality Logging**: Raw ETL issues are written to `dw.data_quality_log`
+  - **Tests** : Generate Tests and View with DBT
+
+- **Power BI** Integration: Build KPI dashboards using Power BI.

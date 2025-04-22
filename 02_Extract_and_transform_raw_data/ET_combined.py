@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 
 def hr_etl_pipeline(job_id=None, engine=None):  
     # PostgreSQL connection
-    engine = engine or create_engine("postgresql+psycopg2://postgres:root@localhost:5432/DW_DB")
+    engine = engine or create_engine("postgresql+psycopg2://postgres:root@localhost:5432/ETL_DB")
     job_id = job_id or str(uuid.uuid4())
 
     # Load HR dataset
@@ -33,7 +33,7 @@ def hr_etl_pipeline(job_id=None, engine=None):
 
     for i, val in enumerate(original_gender):
         if val not in gender_map and val not in ['M', 'F']:
-            dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'Gender',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'Gender',
                         'row_reference': hr_df.at[i, 'EmployeeID'], 'original_value': val,
                         'issue': 'Unknown gender, set to UNKNOWN'})
 
@@ -45,7 +45,7 @@ def hr_etl_pipeline(job_id=None, engine=None):
             try:
                 return pd.to_datetime(date_val, dayfirst=True).strftime("%Y-%m-%d")
             except:
-                dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'DateOfJoining',
+                dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'DateOfJoining',
                             'row_reference': hr_df.at[row_index, 'EmployeeID'], 'original_value': date_val,
                             'issue': 'Invalid date format'})
                 return np.nan
@@ -59,7 +59,7 @@ def hr_etl_pipeline(job_id=None, engine=None):
     hr_df['Salary'] = pd.to_numeric(hr_df['Salary'], errors='coerce')
     for i, val in enumerate(hr_df['Salary']):
         if pd.notnull(val) and val < 0:
-            dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'Salary',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'Salary',
                         'row_reference': hr_df.at[i, 'EmployeeID'], 'original_value': val,
                         'issue': 'Negative salary converted to positive'})
     hr_df['Salary'] = hr_df['Salary'].abs()
@@ -73,7 +73,7 @@ def hr_etl_pipeline(job_id=None, engine=None):
     for i, row in hr_df.iterrows():
         if pd.isna(row['Name']) or str(row['Name']).strip() == '':
             fallback_name = f"EMP_{row['EmployeeID']}" if pd.notna(row['EmployeeID']) else "Unknown Name"
-            dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'Name',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'Name',
                         'row_reference': row['EmployeeID'], 'original_value': row['Name'],
                         'issue': f'Missing name, set to {fallback_name}'})
             hr_df.at[i, 'Name'] = fallback_name
@@ -82,7 +82,7 @@ def hr_etl_pipeline(job_id=None, engine=None):
     for i, row in hr_df.iterrows():
         if pd.isna(row['EmployeeID']):
             fallback_id = f"TEMP_{i + 1}"
-            dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'EmployeeID',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'EmployeeID',
                         'row_reference': 'Unknown', 'original_value': row['EmployeeID'],
                         'issue': f'Missing EmployeeID, set to {fallback_id}'})
             hr_df.at[i, 'EmployeeID'] = fallback_id
@@ -110,7 +110,7 @@ def hr_etl_pipeline(job_id=None, engine=None):
     # Build audit log record
     audit_log = pd.DataFrame([{
         'job_id': job_id,
-        'table_name': 'staging_employee',
+        'table_name': 'raw_hr',
         'etl_stage': 'hr_staging_load',
         'rows_processed': rows_processed,
         'rows_failed': rows_failed,
@@ -123,7 +123,7 @@ def hr_etl_pipeline(job_id=None, engine=None):
     return( f"HR ETL completed-Job ID:{job_id}" )
 
 def finance_etl_pipeline(job_id=None, engine=None):
-    engine =engine or create_engine("postgresql+psycopg2://postgres:root@localhost:5432/DW_DB")
+    engine =engine or create_engine("postgresql+psycopg2://postgres:root@localhost:5432/ETL_DB")
     job_id = job_id or str(uuid.uuid4())
 
     finance_df = pd.read_excel("Finance_Dataset_Dirty.xlsx").copy()
@@ -135,7 +135,7 @@ def finance_etl_pipeline(job_id=None, engine=None):
     finance_df['expense_type'] = finance_df['expense_type'].replace({'Travell': 'Travel'})
     for i, val in enumerate(finance_df['expense_type']):
         if val.strip() == '' or pd.isna(val):
-            dq_log.append({'job_id': job_id, 'table_name': 'staging_finance', 'column_name': 'expense_type',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_finance', 'column_name': 'expense_type',
                         'row_reference': finance_df.at[i, 'EmployeeID'], 'original_value': val,
                         'issue': 'Missing or empty expense type'})
 
@@ -144,7 +144,7 @@ def finance_etl_pipeline(job_id=None, engine=None):
     finance_df['is_refund'] = finance_df['expense_amount'] < 0
     for i, val in enumerate(finance_df['expense_amount']):
         if pd.isnull(val):
-            dq_log.append({'job_id': job_id, 'table_name': 'staging_finance', 'column_name': 'expense_amount',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_finance', 'column_name': 'expense_amount',
                         'row_reference': finance_df.at[i, 'EmployeeID'], 'original_value': finance_df.at[i, 'ExpenseAmount'],
                         'issue': 'Invalid or missing expense amount'})
     # finance_df['expense_amount'] = finance_df['expense_amount'].abs()
@@ -157,7 +157,7 @@ def finance_etl_pipeline(job_id=None, engine=None):
             try:
                 return pd.to_datetime(date_val, dayfirst=True).strftime("%Y-%m-%d")
             except:
-                dq_log.append({'job_id': job_id, 'table_name': 'staging_finance', 'column_name': 'expense_date',
+                dq_log.append({'job_id': job_id, 'table_name': 'raw_finance', 'column_name': 'expense_date',
                             'row_reference': finance_df.at[row_index, 'EmployeeID'], 'original_value': date_val,
                             'issue': 'Invalid date format'})
                 return np.nan
@@ -200,7 +200,7 @@ def finance_etl_pipeline(job_id=None, engine=None):
 
     audit_log = pd.DataFrame([{
         'job_id': job_id,
-        'table_name': 'staging_finance',
+        'table_name': 'raw_finance',
         'etl_stage': 'finance_staging_load',
         'rows_processed': rows_processed,
         'rows_failed': rows_failed,
@@ -214,7 +214,7 @@ def finance_etl_pipeline(job_id=None, engine=None):
 
 
 def operations_etl_pipeline(job_id=None, engine=None):
-    engine = engine or create_engine("postgresql+psycopg2://postgres:root@localhost:5432/DW_DB")
+    engine = engine or create_engine("postgresql+psycopg2://postgres:root@localhost:5432/ETL_DB")
     job_id = job_id or str(uuid.uuid4())
 
     ops_df = pd.read_excel("Operations_Dataset_Dirty.xlsx").copy()
@@ -231,7 +231,7 @@ def operations_etl_pipeline(job_id=None, engine=None):
     for i, val in enumerate(ops_df['department_name']):
         if val=='UNASSIGNED_DEPT':
             dq_log.append({
-                'job_id': job_id, 'table_name': 'staging_operations', 'column_name': 'department_name',
+                'job_id': job_id, 'table_name': 'raw_operations', 'column_name': 'department_name',
                 'row_reference': str(i + 1), 'original_value': ops_df.at[i, 'department_name'],
                 'issue': 'Department Name is empty, defaulted to UNASSIGNED_DEPT'
             })
@@ -247,7 +247,7 @@ def operations_etl_pipeline(job_id=None, engine=None):
     for i, val in enumerate(ops_df['process_name']):
         if val=='UNKNOWN_PROCESS':
             dq_log.append({
-                'job_id': job_id, 'table_name': 'staging_operations', 'column_name': 'process_name',
+                'job_id': job_id, 'table_name': 'raw_operations', 'column_name': 'process_name',
                 'row_reference': str(i + 1), 'original_value': ops_df.at[i, 'process_name'],
                 'issue': 'Process Name is empty, defaulted to UNKNOWN_PROCESS'
             })
@@ -260,7 +260,7 @@ def operations_etl_pipeline(job_id=None, engine=None):
     for i, val in enumerate(ops_df['location_name']):
         if val=='UNKNOWN_LOCATION':
             dq_log.append({
-                'job_id': job_id, 'table_name': 'staging_operations', 'column_name': 'location_name',
+                'job_id': job_id, 'table_name': 'raw_operations', 'column_name': 'location_name',
                 'row_reference': str(i + 1), 'original_value': ops_df.at[i, 'location_name'],
                 'issue': 'Location Name is empty, defaulted to UNKNOWN_LOCATION'
             })
@@ -283,7 +283,7 @@ def operations_etl_pipeline(job_id=None, engine=None):
     for i, val in enumerate(ops_df['downtime_hours']):
         if pd.isnull(val):
             dq_log.append({
-                'job_id': job_id, 'table_name': 'staging_operations', 'column_name': 'downtime_hours',
+                'job_id': job_id, 'table_name': 'raw_operations', 'column_name': 'downtime_hours',
                 'row_reference': str(i + 1), 'original_value': ops_df.at[i, 'DowntimeHours'],
                 'issue': 'Downtime missing and no group average available'
             })
@@ -299,10 +299,10 @@ def operations_etl_pipeline(job_id=None, engine=None):
                 return pd.to_datetime(date_val, dayfirst=True).strftime("%Y-%m-%d")
             except:
                 dq_log.append({
-                    'job_id': job_id, 'table_name': 'staging_operations',
+                    'job_id': job_id, 'table_name': 'raw_operations',
                     'column_name': 'process_date',
                     'row_reference': str(row_index + 1),  
-                    'original_value': val,
+                    'original_value': date_val,
                     'issue': 'Invalid date format, set to 1957-01-01'
                 })
                 return '1957-01-01'
@@ -335,7 +335,7 @@ def operations_etl_pipeline(job_id=None, engine=None):
 
     audit_log = pd.DataFrame([{
         'job_id': job_id,
-        'table_name': 'staging_operations',
+        'table_name': 'raw_operations',
         'etl_stage': 'operations_staging_load',
         'rows_processed': rows_processed,
         'rows_failed': rows_failed,
@@ -352,7 +352,7 @@ def operations_etl_pipeline(job_id=None, engine=None):
 
 
 job_id = str(uuid.uuid4())  
-engine = create_engine("postgresql+psycopg2://postgres:root@localhost:5432/DW_DB")
+engine = create_engine("postgresql+psycopg2://postgres:root@localhost:5432/ETL_DB")
 print(hr_etl_pipeline(job_id,engine))
 print(finance_etl_pipeline(job_id,engine))
 print(operations_etl_pipeline(job_id,engine))

@@ -5,9 +5,9 @@ import uuid
 from datetime import datetime
 from sqlalchemy import create_engine
 
-def finance_etl_pipeline():
-    engine = create_engine("postgresql+psycopg2://postgres:root@localhost:5432/DW_DB")
-    job_id = str(uuid.uuid4())
+def finance_etl_pipeline(job_id=None, engine=None):
+    engine =engine or create_engine("postgresql+psycopg2://postgres:root@localhost:5432/ETL_DB")
+    job_id = job_id or str(uuid.uuid4())
 
     finance_df = pd.read_excel("Finance_Dataset_Dirty.xlsx").copy()
     dq_log = []
@@ -18,7 +18,7 @@ def finance_etl_pipeline():
     finance_df['expense_type'] = finance_df['expense_type'].replace({'Travell': 'Travel'})
     for i, val in enumerate(finance_df['expense_type']):
         if val.strip() == '' or pd.isna(val):
-            dq_log.append({'job_id': job_id, 'table_name': 'staging_finance', 'column_name': 'expense_type',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_finance', 'column_name': 'expense_type',
                         'row_reference': finance_df.at[i, 'EmployeeID'], 'original_value': val,
                         'issue': 'Missing or empty expense type'})
 
@@ -27,7 +27,7 @@ def finance_etl_pipeline():
     finance_df['is_refund'] = finance_df['expense_amount'] < 0
     for i, val in enumerate(finance_df['expense_amount']):
         if pd.isnull(val):
-            dq_log.append({'job_id': job_id, 'table_name': 'staging_finance', 'column_name': 'expense_amount',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_finance', 'column_name': 'expense_amount',
                         'row_reference': finance_df.at[i, 'EmployeeID'], 'original_value': finance_df.at[i, 'ExpenseAmount'],
                         'issue': 'Invalid or missing expense amount'})
     # finance_df['expense_amount'] = finance_df['expense_amount'].abs()
@@ -40,7 +40,7 @@ def finance_etl_pipeline():
             try:
                 return pd.to_datetime(date_val, dayfirst=True).strftime("%Y-%m-%d")
             except:
-                dq_log.append({'job_id': job_id, 'table_name': 'staging_finance', 'column_name': 'expense_date',
+                dq_log.append({'job_id': job_id, 'table_name': 'raw_finance', 'column_name': 'expense_date',
                             'row_reference': finance_df.at[row_index, 'EmployeeID'], 'original_value': date_val,
                             'issue': 'Invalid date format'})
                 return np.nan
@@ -83,7 +83,7 @@ def finance_etl_pipeline():
 
     audit_log = pd.DataFrame([{
         'job_id': job_id,
-        'table_name': 'staging_finance',
+        'table_name': 'raw_finance',
         'etl_stage': 'finance_staging_load',
         'rows_processed': rows_processed,
         'rows_failed': rows_failed,

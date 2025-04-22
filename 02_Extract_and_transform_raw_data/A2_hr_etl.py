@@ -5,11 +5,10 @@ import uuid
 from datetime import datetime
 from sqlalchemy import create_engine
 
-
-def hr_etl_pipeline():  
+def hr_etl_pipeline(job_id=None, engine=None):  
     # PostgreSQL connection
-    engine = create_engine("postgresql+psycopg2://postgres:root@localhost:5432/DW_DB")
-    job_id = str(uuid.uuid4())
+    engine = engine or create_engine("postgresql+psycopg2://postgres:root@localhost:5432/ETL_DB")
+    job_id = job_id or str(uuid.uuid4())
 
     # Load HR dataset
     hr_df = pd.read_excel("HR_Dataset_Dirty.xlsx").copy()
@@ -32,7 +31,7 @@ def hr_etl_pipeline():
 
     for i, val in enumerate(original_gender):
         if val not in gender_map and val not in ['M', 'F']:
-            dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'Gender',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'Gender',
                         'row_reference': hr_df.at[i, 'EmployeeID'], 'original_value': val,
                         'issue': 'Unknown gender, set to UNKNOWN'})
 
@@ -44,7 +43,7 @@ def hr_etl_pipeline():
             try:
                 return pd.to_datetime(date_val, dayfirst=True).strftime("%Y-%m-%d")
             except:
-                dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'DateOfJoining',
+                dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'DateOfJoining',
                             'row_reference': hr_df.at[row_index, 'EmployeeID'], 'original_value': date_val,
                             'issue': 'Invalid date format'})
                 return np.nan
@@ -58,7 +57,7 @@ def hr_etl_pipeline():
     hr_df['Salary'] = pd.to_numeric(hr_df['Salary'], errors='coerce')
     for i, val in enumerate(hr_df['Salary']):
         if pd.notnull(val) and val < 0:
-            dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'Salary',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'Salary',
                         'row_reference': hr_df.at[i, 'EmployeeID'], 'original_value': val,
                         'issue': 'Negative salary converted to positive'})
     hr_df['Salary'] = hr_df['Salary'].abs()
@@ -72,7 +71,7 @@ def hr_etl_pipeline():
     for i, row in hr_df.iterrows():
         if pd.isna(row['Name']) or str(row['Name']).strip() == '':
             fallback_name = f"EMP_{row['EmployeeID']}" if pd.notna(row['EmployeeID']) else "Unknown Name"
-            dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'Name',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'Name',
                         'row_reference': row['EmployeeID'], 'original_value': row['Name'],
                         'issue': f'Missing name, set to {fallback_name}'})
             hr_df.at[i, 'Name'] = fallback_name
@@ -81,7 +80,7 @@ def hr_etl_pipeline():
     for i, row in hr_df.iterrows():
         if pd.isna(row['EmployeeID']):
             fallback_id = f"TEMP_{i + 1}"
-            dq_log.append({'job_id': job_id, 'table_name': 'dim_employee', 'column_name': 'EmployeeID',
+            dq_log.append({'job_id': job_id, 'table_name': 'raw_hr', 'column_name': 'EmployeeID',
                         'row_reference': 'Unknown', 'original_value': row['EmployeeID'],
                         'issue': f'Missing EmployeeID, set to {fallback_id}'})
             hr_df.at[i, 'EmployeeID'] = fallback_id
@@ -109,7 +108,7 @@ def hr_etl_pipeline():
     # Build audit log record
     audit_log = pd.DataFrame([{
         'job_id': job_id,
-        'table_name': 'staging_employee',
+        'table_name': 'raw_hr',
         'etl_stage': 'hr_staging_load',
         'rows_processed': rows_processed,
         'rows_failed': rows_failed,
