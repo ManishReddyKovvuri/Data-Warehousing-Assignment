@@ -204,7 +204,7 @@ This will:
 | `super_user`      | Admins and full-access users                | `super_pass` |
 | `staging_executor`| ETL script executor (staging inserts only) | `stage_pass`  |
 
- \i C:/Users/kovvu/OneDrive/Desktop/Projects/Data-Warehousing-Assignment/01_DW_schema_and_roles_creation/combined_dw_schema.sql
+ 
 
 
 
